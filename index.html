@@ -571,11 +571,28 @@ function addCar(){
  document.getElementById('newCar').value='';document.getElementById('newCarPrice').value='1.00';
  save();render();renderManager();
 }
-function saveCarPrice(i){
+async function saveCarPrice(i){
  if(!cloudSession){alert('Entre como administrador para alterar os valores.');return;}
- const car=db.cars[i],field=document.getElementById('carPrice_'+i),price=Number(field.value);
+ const car=db.cars[i],field=document.getElementById('carPrice_'+i),price=Number(String(field.value).replace(',','.'));
  if(!Number.isFinite(price)||price<=0){alert('Informe um valor por minuto maior que zero.');return;}
- db.carPrices[car]=Number(price.toFixed(2));save();renderManager();alert('Valor de '+car+' atualizado para '+money(db.carPrices[car])+' por minuto.');
+ const newPrice=Number(price.toFixed(2));
+ field.disabled=true;
+ try{
+   const {error}=await supabaseClient.from('app_vehicles').upsert({id:car,name:car,price_per_minute:newPrice},{onConflict:'id'});
+   if(error)throw error;
+   db.carPrices[car]=newPrice;
+   localStorage.setItem(KEY,JSON.stringify(db));
+   cloudError='';
+   renderManager();
+   const msg=document.getElementById('authMessage');
+   if(msg)msg.textContent='Valor salvo no banco: '+car+' = '+money(newPrice)+' por minuto.';
+   alert('Valor de '+car+' salvo: '+money(newPrice)+' por minuto.');
+ }catch(e){
+   field.disabled=false;
+   cloudError=e.message||'Falha ao salvar preço';
+   showCloudMessage();
+   alert('Não foi possível salvar o preço no banco. Erro: '+cloudError);
+ }
 }
 function renderManager(){
  const el=document.getElementById('carManager');if(!el)return;
