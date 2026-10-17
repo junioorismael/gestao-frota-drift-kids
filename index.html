@@ -455,6 +455,8 @@ function rentalCard(r){
    <div class="compact-hint">Toque para ver opções</div>
    ${expanded?`
    <div class="progress"><span style="width:${progress.toFixed(1)}%"></span></div>
+    <div class="time-line">Início ${new Date(r.start).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} → Fim ${new Date(r.end).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+    <div class="vehicle-rate">${money(db.carPrices[r.car]||1)} por minuto</div>
    <div class="meta-grid">
     <div>Status: <b>${expired?'Encerrado':r.paused?'Pausado':'Em andamento'}</b></div>
     <div>Pagamento: <b>${isPaid?paymentLabel:'Pendente'}</b></div>
@@ -522,7 +524,7 @@ function render(){
  document.getElementById('activeBadge').textContent=active.length;
  document.getElementById('availableBadge').textContent=Math.max(0,db.cars.length-active.length);
  document.getElementById('activeDashboard').innerHTML=active.length?active.map(rentalCard).join(''):'<div class="empty" style="width:100%">Nenhum brinquedo em atividade.</div>';
- document.getElementById('fleet').innerHTML=db.cars.filter(c=>!active.some(x=>x.car===c)).map(c=>{const safe=String(c).replace(/'/g,"\\'");return `<div class="card"><div class="carhead"><span class="carname"><i class="dot"></i>${esc(c)}</span><span style="color:#67e889">Livre</span></div><div class="status">Livre</div><div class="vehicle-rate">${money(db.carPrices[c]||1)} por minuto</div><button onclick="openNewFor('${safe}')">Toque para iniciar</button></div>`}).join('') || '<div class="empty" style="grid-column:1/-1">Nenhum brinquedo disponível.</div>';
+ document.getElementById('fleet').innerHTML=db.cars.filter(c=>!active.some(x=>x.car===c)).map(c=>{const safe=String(c).replace(/'/g,"\\'");return `<div class="card"><div class="carhead"><span class="carname"><i class="dot"></i>${esc(c)}</span><span style="color:#67e889">Livre</span></div><div class="status">Livre</div><button onclick="openNewFor('${safe}')">Toque para iniciar</button></div>`}).join('') || '<div class="empty" style="grid-column:1/-1">Nenhum brinquedo disponível.</div>';
 
 }
 function openNewFor(car){openNew();document.getElementById('carSelect').value=car;updateSelectedVehiclePrice()}
