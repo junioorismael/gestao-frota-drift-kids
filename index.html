@@ -596,6 +596,10 @@ async function saveCarPrice(i){
 }
 function renderManager(){
  const el=document.getElementById('carManager');if(!el)return;
+ // A sincronização em segundo plano chama renderManager periodicamente.
+ // Não recria os campos enquanto o gestor está digitando, para evitar que o preço volte ao valor antigo.
+ const focused=document.activeElement;
+ if(focused && el.contains(focused) && focused.matches('input')) return;
  el.innerHTML=db.cars.length?db.cars.map((c,i)=>`<div style="padding:12px 0;border-bottom:1px solid #35404b"><div style="font-weight:bold;margin-bottom:7px">${esc(c)}</div><label for="carPrice_${i}">Valor por minuto (R$)</label><div class="row"><input id="carPrice_${i}" type="number" min="0.01" step="0.01" value="${Number(db.carPrices[c]||1).toFixed(2)}"><button class="btn primary" onclick="saveCarPrice(${i})">Salvar valor</button></div><div class="row"><button class="btn" onclick="renameCar(${i})">Renomear</button><button class="btn" onclick="removeCar(${i})">Remover</button></div></div>`).join(''):'<p class="empty">Nenhum veículo cadastrado. Adicione o primeiro acima.</p>';
 }
 function renameCar(i){if(!cloudSession){alert('Entre como administrador para alterar os veículos.');return}const old=db.cars[i],next=prompt('Novo nome para o veículo:',old);if(next===null)return;const name=next.trim();if(!name||name===old)return;if(db.cars.includes(name)){alert('Já existe um veículo com esse nome.');return}db.cars[i]=name;db.carPrices[name]=Number(db.carPrices[old]||1);delete db.carPrices[old];db.rentals.filter(r=>r.car===old).forEach(r=>r.car=name);save();render();renderManager()}
