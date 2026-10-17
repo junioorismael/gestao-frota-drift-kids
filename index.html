@@ -518,7 +518,6 @@ function render(){
  document.getElementById('activeCount').textContent=active.length;
  document.getElementById('freeCount').textContent=db.cars.length-active.length;
  document.getElementById('raceCount').textContent=db.history.filter(r=>new Date(r.finished).toISOString().slice(0,10)===today()).length;
- document.getElementById('dailyTotal').textContent=money(db.history.filter(r=>new Date(r.finished).toISOString().slice(0,10)===today()).reduce((a,r)=>a+r.finalValue,0));
  document.getElementById('todayLabel').textContent=new Date().toLocaleDateString('pt-BR',{dateStyle:'full'});
  const dashVehicleCount=document.getElementById('dashVehicleCount'); if(dashVehicleCount) dashVehicleCount.textContent=db.cars.length+' veículo'+(db.cars.length===1?'':'s');
  document.getElementById('activeBadge').textContent=active.length;
