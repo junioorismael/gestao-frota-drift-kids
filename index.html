@@ -526,7 +526,7 @@ function render(){
  document.getElementById('fleet').innerHTML=db.cars.filter(c=>!active.some(x=>x.car===c)).map(c=>{const safe=String(c).replace(/'/g,"\\'");return `<div class="card"><div class="carhead"><span class="carname"><i class="dot"></i>${esc(c)}</span><span style="color:#67e889">Livre</span></div><div class="status">Livre</div><button onclick="openNewFor('${safe}')">Toque para iniciar</button></div>`}).join('') || '<div class="empty" style="grid-column:1/-1">Nenhum brinquedo disponível.</div>';
 
 }
-function openNewFor(car){openNew();document.getElementById('carSelect').value=car}
+function openNewFor(car){openNew();document.getElementById('carSelect').value=car;updateSelectedVehiclePrice()}
 function selectedHistoryDate(){return document.getElementById('historyDate')?.value||today()}
 function setHistoryToday(){document.getElementById('historyDate').value=today();renderHistory()}
 function renderHistory(){
