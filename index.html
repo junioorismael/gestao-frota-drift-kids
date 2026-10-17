@@ -387,7 +387,7 @@ function remaining(r){
  }
  return r.end-Date.now();
 }
-function fmt(ms){let sign=ms<0?'-':'';ms=Math.abs(ms);let s=Math.floor(ms/1000),h=Math.floor(s/3600);s%=3600;let m=Math.floor(s/60);s%=60;return sign+[h,m,s].map(n=>String(n).padStart(2,'0')).join(':')}
+function fmt(ms){let sign=ms<0?'-':'';ms=Math.abs(ms);let totalSeconds=Math.floor(ms/1000),m=Math.floor(totalSeconds/60),s=totalSeconds%60;return sign+[m,s].map(n=>String(n).padStart(2,'0')).join(':')}
 function billableElapsed(r){
  // O tempo ultrapassado após o zero não é cobrado.
  // Quando minutos extras são adicionados, o período excedido antes do acréscimo
@@ -456,7 +456,7 @@ function rentalCard(r){
    ${expanded?`
    <div class="progress"><span style="width:${progress.toFixed(1)}%"></span></div>
     <div class="time-line">Início ${new Date(r.start).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} → Fim ${new Date(r.end).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
-    <div class="vehicle-rate">${money(db.carPrices[r.car]||1)} por minuto</div>
+
    <div class="meta-grid">
     <div>Status: <b>${expired?'Encerrado':r.paused?'Pausado':'Em andamento'}</b></div>
     <div>Pagamento: <b>${isPaid?paymentLabel:'Pendente'}</b></div>
