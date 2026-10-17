@@ -239,7 +239,7 @@ async function loadCloud(initial=false){
   cloudBusy=true;
   try{
     const [{data:vehicles,error:ve},{data:rows,error:re}]=await Promise.all([
-      supabaseClient.from('app_vehicles').select('id,name'),
+      supabaseClient.from('app_vehicles').select('id,name,price_per_minute'),
       supabaseClient.from('app_rentals').select('id,car,status,payload,updated_at')
     ]);
     if(ve)throw ve;if(re)throw re;
