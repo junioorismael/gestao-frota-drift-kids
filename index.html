@@ -91,7 +91,7 @@ Lucro do dia: <span id="reportProfit">R$ 0,00</span>
 <p id="authMessage" class="sub">O uso dos cronômetros continua disponível sem entrar.</p>
 </div>
 <div class="panel hidden" id="adminControls">
-<label for="newCar">Adicionar veículo</label><div class="row"><input id="newCar" placeholder="Ex.: Van da equipe" maxlength="40" onkeydown="if(event.key==='Enter')addCar()"><button class="btn primary" onclick="addCar()">Adicionar</button></div><div id="carManager" class="manage-list"></div><hr style="border:0;border-top:1px solid #35404b;margin:18px 0"><button class="btn" onclick="testSound()">🔊 Testar som</button> <button class="btn" onclick="toggleSound()" id="soundToggle">🔔 Som ativado</button><p class="sub">Ao atingir o tempo previsto, o aparelho emite um aviso sonoro uma vez por locação.</p><br><button class="btn" onclick="clearAll()">Limpar todos os dados locais</button>
+<label for="newCar">Adicionar veículo</label><div class="row"><input id="newCar" placeholder="Ex.: Carrinho branco" maxlength="40" onkeydown="if(event.key==='Enter')addCar()"><input id="newCarPrice" type="number" min="0.01" step="0.01" value="1.00" aria-label="Valor por minuto do novo veículo"></div><div class="actions" style="margin:8px 0"><button class="btn primary" onclick="addCar()">Adicionar veículo e valor/minuto</button></div><div id="carManager" class="manage-list"></div><hr style="border:0;border-top:1px solid #35404b;margin:18px 0"><button class="btn" onclick="testSound()">🔊 Testar som</button> <button class="btn" onclick="toggleSound()" id="soundToggle">🔔 Som ativado</button><p class="sub">Ao atingir o tempo previsto, o aparelho emite um aviso sonoro uma vez por locação.</p><br><button class="btn" onclick="clearAll()">Limpar todos os dados locais</button>
 <p class="sub">Os dados são sincronizados com o Supabase para aparecerem nos outros aparelhos.</p>
 </div>
 </div></div>
@@ -108,7 +108,7 @@ Lucro do dia: <span id="reportProfit">R$ 0,00</span>
 <div class="panel modal-panel" style="max-width:520px;margin:18px auto">
 <h2>Nova locação</h2>
 <label>Veículo</label><select id="carSelect"></select>
-<div class="row"><div><label>Tempo inicial (minutos)</label><input id="minutes" type="number" min="1" value="10" oninput="previewEnd()"></div><div><label>Valor por minuto</label><input id="pricePerMinute" type="number" min="0.01" step="0.01" value="1.00" oninput="previewEnd()"></div></div>
+<div class="row"><div><label>Tempo inicial (minutos)</label><input id="minutes" type="number" min="1" value="10" oninput="previewEnd()"></div><div><label>Valor por minuto do veículo (definido pelo gestor)</label><input id="pricePerMinute" type="number" min="0.01" step="0.01" value="1.00" readonly></div></div>
 <div style="margin-top:10px;padding:12px;border-radius:10px;background:#18211b;color:#67e889;font-weight:bold">
 💰 <span id="previewRate">R$ 1,00</span> por minuto<br>
 <span style="color:#dce3ea;font-weight:normal;font-size:13px">Início: <b id="previewStart">--:--</b> • Fim previsto: <b id="previewEnd">--:--</b> • Total previsto: <b id="previewValue">R$ 10,00</b></span>
@@ -143,9 +143,10 @@ Lucro do dia: <span id="reportProfit">R$ 0,00</span>
 <script>
 const KEY='frota_timer_v1';
 let db=JSON.parse(localStorage.getItem(KEY)||'null')||{
- cars:[],
- rentals:[], history:[]
+ cars:[], carPrices:{}, rentals:[], history:[]
 };
+if(!db.carPrices)db.carPrices={};
+db.cars.forEach(c=>{if(!Number.isFinite(Number(db.carPrices[c]))||Number(db.carPrices[c])<=0)db.carPrices[c]=1;});
 // Remove emojis de veículo que possam ter sido salvos no nome (ex.: 🚗 Carro Vermelho).
 const cleanVehicleName=v=>String(v||'').replace(/^[\s]*(?:🚗|🚘|🚙|🚕|🚓|🚑|🚒|🛻|🚐|🚚|🚛|🔴|🟥)+[\s]*/u,'').trim();
 db.cars=db.cars.map(cleanVehicleName).filter(Boolean);
@@ -184,12 +185,12 @@ async function syncToCloud(){
       if(error)throw error;
     }
     if(cloudSession){
-      const vehicles=db.cars.map(name=>({id:name,name}));
+      const vehicles=db.cars.map(name=>({id:name,name,price_per_minute:Number(db.carPrices[name]||1)}));
       if(vehicles.length){
         const {error}=await supabaseClient.from('app_vehicles').upsert(vehicles,{onConflict:'id'});
         if(error)throw error;
       }
-      const {data:remoteVehicles,error:readError}=await supabaseClient.from('app_vehicles').select('id,name');
+      const {data:remoteVehicles,error:readError}=await supabaseClient.from('app_vehicles').select('id,name,price_per_minute');
       if(readError)throw readError;
       const stale=(remoteVehicles||[]).filter(v=>!db.cars.includes(v.name)).map(v=>v.id);
       if(stale.length){
@@ -243,11 +244,12 @@ async function loadCloud(initial=false){
     ]);
     if(ve)throw ve;if(re)throw re;
     if((vehicles||[]).length===0 && cloudSession && db.cars.length){
-      const seed=db.cars.map(name=>({id:name,name}));
+      const seed=db.cars.map(name=>({id:name,name,price_per_minute:Number(db.carPrices[name]||1)}));
       const {error}=await supabaseClient.from('app_vehicles').upsert(seed,{onConflict:'id'});
       if(error)throw error;
     }else if((vehicles||[]).length){
       db.cars=vehicles.map(v=>v.name);
+      vehicles.forEach(v=>{db.carPrices[v.name]=Number(v.price_per_minute)>0?Number(v.price_per_minute):1;});
     }
     const valid=(rows||[]).filter(x=>x.status==='active'||x.status==='finished');
     if(valid.length || !initial){
@@ -309,15 +311,22 @@ function openNew(){
  db.cars.forEach(c=>{if(!db.rentals.some(r=>r.car===c&&r.status==='active'))sel.add(new Option(c,c))});
  if(!sel.options.length){alert('Não há veículos disponíveis.');return}
  document.getElementById('modal').classList.remove('hidden');
+ sel.onchange=updateSelectedVehiclePrice;
+ updateSelectedVehiclePrice();
  document.getElementById('paymentStatus').value='paid';
  document.getElementById('paymentMethod').value='dinheiro';
  togglePaymentMethod();
  previewEnd();
 }
 function closeModal(){document.getElementById('modal').classList.add('hidden')}
+function updateSelectedVehiclePrice(){
+ const car=document.getElementById('carSelect').value;
+ document.getElementById('pricePerMinute').value=Number(db.carPrices[car]||1).toFixed(2);
+ previewEnd();
+}
 function previewEnd(){
  const mins=Math.max(1,Number(document.getElementById('minutes').value)||1);
-  const rate=Math.max(0.01,Number(document.getElementById('pricePerMinute').value)||0.01);
+ const rate=Math.max(0.01,Number(document.getElementById('pricePerMinute').value)||0.01);
  const now=new Date();
  const end=new Date(now.getTime()+mins*60000);
  document.getElementById('previewStart').textContent=now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -357,7 +366,7 @@ function confirmPendingPayment(){
 function startRental(){
  const car=document.getElementById('carSelect').value,client='';
  const minutes=Math.max(1,Number(document.getElementById('minutes').value)||1);
- const price=Math.max(0.01,Number(document.getElementById('pricePerMinute').value)||0.01);
+ const price=Math.max(0.01,Number(db.carPrices[car]||1));
  const mode='perMinute';
  const startTime=Date.now();
  const paymentStatus=document.getElementById('paymentStatus').value;
@@ -551,10 +560,29 @@ function drawChart(arr){
  ctx.strokeStyle='#607080';ctx.beginPath();ctx.moveTo(35,15);ctx.lineTo(35,195);ctx.lineTo(680,195);ctx.stroke();
  keys.forEach((k,i)=>{let x=50+i*(620/Math.max(1,keys.length)),h=days[k]/max*160;ctx.fillStyle='#63e27d';ctx.fillRect(x,195-h,22,h);ctx.fillStyle='#dce3ea';ctx.font='12px Arial';ctx.fillText(k,x,215)});
 }
-function addCar(){if(!cloudSession){alert('Entre como administrador para alterar os veículos.');return}let c=document.getElementById('newCar').value.trim();if(!c)return;if(db.cars.includes(c)){alert('Já existe um veículo com esse nome.');return}db.cars.push(c);document.getElementById('newCar').value='';save();render();renderManager()}
-function renderManager(){const el=document.getElementById('carManager');if(!el)return;el.innerHTML=db.cars.length?db.cars.map((c,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #35404b"><span style="flex:1">${esc(c)}</span><button class="btn" onclick="renameCar(${i})">Renomear</button><button class="btn" onclick="removeCar(${i})">Remover</button></div>`).join(''):'<p class="empty">Nenhum veículo cadastrado. Adicione o primeiro acima.</p>'}
-function renameCar(i){if(!cloudSession){alert('Entre como administrador para alterar os veículos.');return}const old=db.cars[i],next=prompt('Novo nome para o veículo:',old);if(next===null)return;const name=next.trim();if(!name||name===old)return;if(db.cars.includes(name)){alert('Já existe um veículo com esse nome.');return}db.cars[i]=name;db.rentals.filter(r=>r.car===old).forEach(r=>r.car=name);save();render();renderManager()}
-function removeCar(i){if(!cloudSession){alert('Entre como administrador para alterar os veículos.');return}const name=db.cars[i];if(db.rentals.some(r=>r.car===name&&r.status==='active')){alert('Finalize a locação ativa antes de remover este veículo.');return}if(confirm('Remover '+name+' da frota?')){db.cars.splice(i,1);save();render();renderManager()}}
+function addCar(){
+ if(!cloudSession){alert('Entre como administrador para alterar os veículos.');return;}
+ const c=document.getElementById('newCar').value.trim();
+ const price=Number(document.getElementById('newCarPrice').value);
+ if(!c)return;
+ if(!Number.isFinite(price)||price<=0){alert('Informe um valor por minuto maior que zero.');return;}
+ if(db.cars.includes(c)){alert('Já existe um veículo com esse nome.');return;}
+ db.cars.push(c);db.carPrices[c]=Number(price.toFixed(2));
+ document.getElementById('newCar').value='';document.getElementById('newCarPrice').value='1.00';
+ save();render();renderManager();
+}
+function saveCarPrice(i){
+ if(!cloudSession){alert('Entre como administrador para alterar os valores.');return;}
+ const car=db.cars[i],field=document.getElementById('carPrice_'+i),price=Number(field.value);
+ if(!Number.isFinite(price)||price<=0){alert('Informe um valor por minuto maior que zero.');return;}
+ db.carPrices[car]=Number(price.toFixed(2));save();renderManager();alert('Valor de '+car+' atualizado para '+money(db.carPrices[car])+' por minuto.');
+}
+function renderManager(){
+ const el=document.getElementById('carManager');if(!el)return;
+ el.innerHTML=db.cars.length?db.cars.map((c,i)=>`<div style="padding:12px 0;border-bottom:1px solid #35404b"><div style="font-weight:bold;margin-bottom:7px">${esc(c)}</div><label for="carPrice_${i}">Valor por minuto (R$)</label><div class="row"><input id="carPrice_${i}" type="number" min="0.01" step="0.01" value="${Number(db.carPrices[c]||1).toFixed(2)}"><button class="btn primary" onclick="saveCarPrice(${i})">Salvar valor</button></div><div class="row"><button class="btn" onclick="renameCar(${i})">Renomear</button><button class="btn" onclick="removeCar(${i})">Remover</button></div></div>`).join(''):'<p class="empty">Nenhum veículo cadastrado. Adicione o primeiro acima.</p>';
+}
+function renameCar(i){if(!cloudSession){alert('Entre como administrador para alterar os veículos.');return}const old=db.cars[i],next=prompt('Novo nome para o veículo:',old);if(next===null)return;const name=next.trim();if(!name||name===old)return;if(db.cars.includes(name)){alert('Já existe um veículo com esse nome.');return}db.cars[i]=name;db.carPrices[name]=Number(db.carPrices[old]||1);delete db.carPrices[old];db.rentals.filter(r=>r.car===old).forEach(r=>r.car=name);save();render();renderManager()}
+function removeCar(i){if(!cloudSession){alert('Entre como administrador para alterar os veículos.');return}const name=db.cars[i];if(db.rentals.some(r=>r.car===name&&r.status==='active')){alert('Finalize a locação ativa antes de remover este veículo.');return}if(confirm('Remover '+name+' da frota?')){db.cars.splice(i,1);delete db.carPrices[name];save();render();renderManager()}}
 function clearAll(){if(confirm('Apagar todos os dados deste navegador?')){localStorage.removeItem(KEY);location.reload()}}
 document.querySelectorAll('nav button[data-page]').forEach(btn=>{
  btn.addEventListener('click',()=>showPage(btn.dataset.page));
