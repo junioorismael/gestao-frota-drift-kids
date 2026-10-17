@@ -451,7 +451,6 @@ function rentalCard(r){
     <button class="pause-mini" onclick="event.stopPropagation();pauseRental(${r.id})" title="${r.paused?'Continuar':'Pausar'}">${r.paused?'▶':'Ⅱ'}</button>
    </div>
    <div class="timer">${fmt(left)}</div>
-   <div class="vehicle-rate">${money(db.carPrices[r.car]||1)} por minuto</div>
    <div class="compact-hint">Toque para ver opções</div>
    ${expanded?`
    <div class="progress"><span style="width:${progress.toFixed(1)}%"></span></div>
