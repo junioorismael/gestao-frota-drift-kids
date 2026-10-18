@@ -567,12 +567,21 @@ function addTime(id){
  if(!Number.isFinite(extra)||extra<=0)return;
  const beforeAllocatedMs=Math.max(0,(r.minutes||0)*60000);
  const elapsedMs=elapsed(r);
- // Se já passou do zero, não deixe o tempo excedido entrar na nova cobrança.
+ // Exclui da cobrança o tempo excedido antes de adicionar novos minutos.
  if(elapsedMs>beforeAllocatedMs){
    r.excludedBillingMs=(r.excludedBillingMs||0)+(elapsedMs-beforeAllocatedMs);
  }
+ const remainingBefore=remaining(r);
  r.minutes=(r.minutes||0)+extra;
- r.end+=extra*60000;
+ if(remainingBefore<0){
+   // Se já estava negativo, reinicia o cronômetro no total de minutos adicionados.
+   // Em pausa, usa o instante em que foi pausado para manter o cronômetro congelado.
+   const timerBase=r.paused?(r.start+(r.pauseTotal||0)+(r.elapsed||0)):Date.now();
+   r.end=timerBase+extra*60000;
+ }else{
+   // Se ainda havia tempo, acrescenta os minutos ao tempo restante atual.
+   r.end+=extra*60000;
+ }
  save();render();
 }
 function render(){
