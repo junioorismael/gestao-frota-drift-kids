@@ -207,6 +207,8 @@ const SUPABASE_KEY='sb_publishable_pmpD869xttLdchhAZ6UvLw_ACXn4iBJ';
 let supabaseClient=null;
 let cloudReady=false;
 let cloudBusy=false;
+let syncQueued=false;
+let lastLocalChange=0;
 let cloudSession=null;
 let cloudTimer=null;
 let cloudError='';
@@ -220,11 +222,14 @@ const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'B
 const today=()=>new Date().toISOString().slice(0,10);
 function save(){
   localStorage.setItem(KEY,JSON.stringify(db));
+  lastLocalChange=Date.now();
   if(cloudReady) syncToCloud();
 }
 async function syncToCloud(){
-  if(!supabaseClient||!cloudReady||cloudBusy)return;
+  if(!supabaseClient||!cloudReady)return;
+  if(cloudBusy){syncQueued=true;return;}
   cloudBusy=true;
+  syncQueued=false;
   try{
     const rows=[...db.rentals.map(r=>({id:String(r.id),car:r.car,status:'active',payload:r,updated_at:new Date().toISOString()})),
       ...db.history.map(r=>({id:String(r.id),car:r.car,status:'finished',payload:r,updated_at:new Date().toISOString()}))];
@@ -248,7 +253,10 @@ async function syncToCloud(){
     }
     cloudError='';
   }catch(e){cloudError=e.message||'Falha ao sincronizar';showCloudMessage()}
-  finally{cloudBusy=false}
+  finally{
+    cloudBusy=false;
+    if(syncQueued){syncQueued=false;syncToCloud();}
+  }
 }
 function showCloudMessage(){
   const el=document.getElementById('authMessage');
@@ -284,6 +292,9 @@ async function adminLogout(){
 }
 async function loadCloud(initial=false){
   if(!supabaseClient||cloudBusy)return;
+  // Evita substituir uma ação recente (iniciar/finalizar) por dados antigos do servidor.
+  if(!initial && Date.now()-lastLocalChange<10000)return;
+  const localChangeAtStart=lastLocalChange;
   cloudBusy=true;
   try{
     const [{data:vehicles,error:ve},{data:rows,error:re}]=await Promise.all([
@@ -291,6 +302,8 @@ async function loadCloud(initial=false){
       supabaseClient.from('app_rentals').select('id,car,status,payload,updated_at')
     ]);
     if(ve)throw ve;if(re)throw re;
+    // Se o usuário alterou a frota durante a consulta, prioriza a alteração local e sincroniza.
+    if(lastLocalChange!==localChangeAtStart){syncQueued=true;return;}
     if((vehicles||[]).length===0 && cloudSession && db.cars.length){
       const seed=db.cars.map(name=>({id:name,name,price_per_minute:Number(db.carPrices[name]||1)}));
       const {error}=await supabaseClient.from('app_vehicles').upsert(seed,{onConflict:'id'});
@@ -313,7 +326,10 @@ async function loadCloud(initial=false){
     cloudError='';
     render();renderManager();renderHistory();updateAdminUI();
   }catch(e){cloudError=e.message||'Falha ao carregar dados';showCloudMessage()}
-  finally{cloudBusy=false}
+  finally{
+    cloudBusy=false;
+    if(syncQueued){syncQueued=false;syncToCloud();}
+  }
 }
 async function initCloud(){
   try{
@@ -325,7 +341,7 @@ async function initCloud(){
     cloudReady=true;
     await syncToCloud();
     if(cloudTimer)clearInterval(cloudTimer);
-    cloudTimer=setInterval(()=>loadCloud(false),5000);
+    cloudTimer=setInterval(()=>loadCloud(false),15000);
   }catch(e){cloudError=e.message||'Não foi possível conectar ao Supabase';showCloudMessage()}
 }
 // Corrige corridas ativas criadas pela versão anterior, que gravava R$ 1,00/min por engano.
