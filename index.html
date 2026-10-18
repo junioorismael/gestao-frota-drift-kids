@@ -569,7 +569,7 @@ function addTime(id){
  const elapsedMs=elapsed(r);
  // Exclui da cobrança o tempo excedido antes de adicionar novos minutos.
  if(elapsedMs>beforeAllocatedMs){
-   r.excludedBillingMs=(r.excludedBillingMs||0)+(elapsedMs-beforeAllocatedMs);
+   r.excludedBillingMs=Math.max(Number(r.excludedBillingMs||0),elapsedMs-beforeAllocatedMs);
  }
  const remainingBefore=remaining(r);
  r.minutes=(r.minutes||0)+extra;
