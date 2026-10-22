@@ -313,14 +313,27 @@ async function loadCloud(initial=false){
       vehicles.forEach(v=>{db.carPrices[v.name]=Number(v.price_per_minute)>0?Number(v.price_per_minute):1;});
     }
     const valid=(rows||[]).filter(x=>x.status==='active'||x.status==='finished');
-    if(valid.length || !initial){
-      db.rentals=valid.filter(x=>x.status==='active').map(x=>({...x.payload,id:isNaN(Number(x.id))?x.id:Number(x.id),car:x.car,status:'active'}));
-      db.history=valid.filter(x=>x.status==='finished').map(x=>({...x.payload,id:isNaN(Number(x.id))?x.id:Number(x.id),car:x.car,status:'finished'}));
-    }else if(cloudSession && (db.rentals.length||db.history.length)){
-      // Importa dados locais antigos quando o banco ainda está vazio.
-      cloudBusy=false;
-      await syncToCloud();
-      cloudBusy=true;
+    const remoteRentals=valid.filter(x=>x.status==='active').map(x=>({...x.payload,id:isNaN(Number(x.id))?x.id:Number(x.id),car:x.car,status:'active'}));
+    const remoteHistory=valid.filter(x=>x.status==='finished').map(x=>({...x.payload,id:isNaN(Number(x.id))?x.id:Number(x.id),car:x.car,status:'finished'}));
+    if(initial){
+      // Na primeira carga, mescla os registros locais e remotos por ID para não perder
+      // histórico local antigo quando o banco contém apenas parte das corridas.
+      const mergeById=(local,remote)=>{
+        const merged=new Map();
+        local.forEach(item=>merged.set(String(item.id),item));
+        remote.forEach(item=>merged.set(String(item.id),item));
+        return [...merged.values()];
+      };
+      db.rentals=mergeById(db.rentals,remoteRentals);
+      db.history=mergeById(db.history,remoteHistory);
+      if(cloudSession && (db.rentals.length||db.history.length)){
+        cloudBusy=false;
+        await syncToCloud();
+        cloudBusy=true;
+      }
+    }else{
+      db.rentals=remoteRentals;
+      db.history=remoteHistory;
     }
     localStorage.setItem(KEY,JSON.stringify(db));
     cloudError='';
