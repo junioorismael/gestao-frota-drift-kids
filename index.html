@@ -290,15 +290,10 @@ async function adminLogout(){
   if(supabaseClient)await supabaseClient.auth.signOut();
   cloudSession=null;updateAdminUI();renderManager();
 }
-function isStaleActiveRental(r){
-  const started=Number(r&&r.start);
-  // Uma corrida de aluguel não deve permanecer ativa por mais de 12 horas.
-  return Number.isFinite(started)&&started>0&&(Date.now()-started)>=60*60*1000;
-}
 async function loadCloud(initial=false){
   if(!supabaseClient||cloudBusy)return;
   // Evita substituir uma ação recente (iniciar/finalizar) por dados antigos do servidor.
-  if(!initial && Date.now()-lastLocalChange<1500)return;
+  if(!initial && Date.now()-lastLocalChange<10000)return;
   const localChangeAtStart=lastLocalChange;
   cloudBusy=true;
   try{
@@ -318,19 +313,8 @@ async function loadCloud(initial=false){
       vehicles.forEach(v=>{db.carPrices[v.name]=Number(v.price_per_minute)>0?Number(v.price_per_minute):1;});
     }
     const valid=(rows||[]).filter(x=>x.status==='active'||x.status==='finished');
-    // Corridas antigas presas como ativas são arquivadas como abandonadas,
-    // sem entrar no histórico nem no faturamento.
-    const staleRemote=valid.filter(x=>x.status==='active'&&isStaleActiveRental(x.payload));
-    if(staleRemote.length){
-      const {error:staleError}=await supabaseClient.from('app_rentals')
-        .update({status:'abandoned',updated_at:new Date().toISOString()})
-        .in('id',staleRemote.map(x=>String(x.id)));
-      if(staleError)throw staleError;
-    }
-    db.rentals=db.rentals.filter(r=>!isStaleActiveRental(r));
-    const usable=valid.filter(x=>!(x.status==='active'&&isStaleActiveRental(x.payload)));
-    const remoteRentals=usable.filter(x=>x.status==='active').map(x=>({...x.payload,id:isNaN(Number(x.id))?x.id:Number(x.id),car:x.car,status:'active'}));
-    const remoteHistory=usable.filter(x=>x.status==='finished').map(x=>({...x.payload,id:isNaN(Number(x.id))?x.id:Number(x.id),car:x.car,status:'finished'}));
+    const remoteRentals=valid.filter(x=>x.status==='active').map(x=>({...x.payload,id:isNaN(Number(x.id))?x.id:Number(x.id),car:x.car,status:'active'}));
+    const remoteHistory=valid.filter(x=>x.status==='finished').map(x=>({...x.payload,id:isNaN(Number(x.id))?x.id:Number(x.id),car:x.car,status:'finished'}));
     if(initial){
       // Na primeira carga, mescla os registros locais e remotos por ID para não perder
       // histórico local antigo quando o banco contém apenas parte das corridas.
@@ -370,7 +354,7 @@ async function initCloud(){
     cloudReady=true;
     await syncToCloud();
     if(cloudTimer)clearInterval(cloudTimer);
-    cloudTimer=setInterval(async()=>{await syncToCloud();await loadCloud(false)},10000);
+    cloudTimer=setInterval(()=>loadCloud(false),15000);
   }catch(e){cloudError=e.message||'Não foi possível conectar ao Supabase';showCloudMessage()}
 }
 // Corrige corridas ativas criadas pela versão anterior, que gravava R$ 1,00/min por engano.
