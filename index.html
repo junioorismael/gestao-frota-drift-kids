@@ -298,7 +298,7 @@ function isStaleActiveRental(r){
 async function loadCloud(initial=false){
   if(!supabaseClient||cloudBusy)return;
   // Evita substituir uma ação recente (iniciar/finalizar) por dados antigos do servidor.
-  if(!initial && Date.now()-lastLocalChange<10000)return;
+  if(!initial && Date.now()-lastLocalChange<1500)return;
   const localChangeAtStart=lastLocalChange;
   cloudBusy=true;
   try{
@@ -370,7 +370,7 @@ async function initCloud(){
     cloudReady=true;
     await syncToCloud();
     if(cloudTimer)clearInterval(cloudTimer);
-    cloudTimer=setInterval(async()=>{await syncToCloud();await loadCloud(false)},10000);
+    cloudTimer=setInterval(async()=>{await loadCloud(false);await syncToCloud()},3000);
   }catch(e){cloudError=e.message||'Não foi possível conectar ao Supabase';showCloudMessage()}
 }
 // Corrige corridas ativas criadas pela versão anterior, que gravava R$ 1,00/min por engano.
